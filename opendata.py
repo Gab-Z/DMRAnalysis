@@ -38,3 +38,6 @@ df = pd.DataFrame.from_dict( urlData.json()[ "records" ] )
 #print( df.head( 4 ) )
 
 print( df.columns )
+
+
+print( "prout" )
