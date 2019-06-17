@@ -1,7 +1,9 @@
 import pandas as pd
 import os
+import platform
 import sys
-sys._enablelegacywindowsfsencoding()
+if platform.system() == "Windows" :
+    sys._enablelegacywindowsfsencoding()
 
 class LocalCSVReader() :
 

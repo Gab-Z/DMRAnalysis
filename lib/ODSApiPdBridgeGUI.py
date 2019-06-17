@@ -48,16 +48,23 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
 
         self.datasetsTree = ttk.Treeview ( self.views[ "accueil" ] )
         self.datasetsTree[ "columns" ]=( "one", "two", "three" )
-        self.datasetsTree.column( "#0", width = 100, minwidth = 100, stretch = YES )
-        self.datasetsTree.heading( "#0", text = "Name", anchor = W )
-        self.datasetsTree.column( "one", width = 250, minwidth = 250, stretch = YES )
-        self.datasetsTree.heading( "one", text = "Titre", anchor = W )
-        self.datasetsTree.column( "two", width = 250, minwidth = 250, stretch = YES )
+        self.datasetsTree.column( "#0", width = 200, minwidth = 200, stretch = YES )
+        self.datasetsTree.heading( "#0", text = "Titre", anchor = W )
+        self.datasetsTree.column( "one", width = 350, minwidth = 250, stretch = YES )
+        self.datasetsTree.heading( "one", text = "datasetid", anchor = W )
+        self.datasetsTree.column( "two", width = 100, minwidth = 50, stretch = YES )
         self.datasetsTree.heading( "two", text = "Nb Enregistrements", anchor = W )
-        self.datasetsTree.column( "three", width = 250, minwidth = 250, stretch = YES )
+        self.datasetsTree.column( "three", width = 100, minwidth = 50, stretch = YES )
         self.datasetsTree.heading( "three", text = "Dernier Enregistrement", anchor = W )
-        datasets = self.getDatasets()
-        print( datasets )
+
+        vsb = ttk.Scrollbar( self.views[ "accueil" ], orient = "vertical", command = self.datasetsTree.yview )
+        vsb.pack( side = 'right', fill = 'y' )
+        self.datasetsTree.configure( yscrollcommand = vsb.set )
+
+        dfDatasets = self.getDatasetsInfo( rows = "all" )
+        dfDatasets.sort_values( by = "Jeu de données", kind = 'mergesort', inplace = True )
+        for idx, row in dfDatasets.iterrows() :
+            self.datasetsTree.insert( "", idx + 1, text = row[ 'Jeu de données' ], values = ( row[ "datasetid" ], row[ "Nb enregistrements" ] ) )
 
 
 

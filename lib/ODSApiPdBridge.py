@@ -23,7 +23,7 @@ class ODSApiPdBridge() :
     urlRegEx        = re.compile( "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+" )
     datasetsColumns = {
         'datasetid' : {
-            'enteteDeColonne' : 'datsetid'
+            'enteteDeColonne' : 'datasetid'
         },
         'metas.title' : {
             'enteteDeColonne' : 'Jeu de données'
@@ -209,7 +209,11 @@ class ODSApiPdBridge() :
 
 
     def getDatasetsInfo( self, start = 0, rows = 10 ) :
-        df = self.getDatasets( start = start, rows = rows )[ ODSApiPdBridge.datasetsColumns.keys() ]
+        if rows == "all" :
+            rows = int( self.getNbDatasets() )
+        df = self.getDatasets(
+            start = start,
+            rows = rows )[ ODSApiPdBridge.datasetsColumns.keys() ]
         df.columns = ODSApiPdBridge.datasetsColumnsTitles
         return df
 
