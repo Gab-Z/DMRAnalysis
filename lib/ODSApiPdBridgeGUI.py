@@ -1,6 +1,7 @@
 from lib.ODSApiPdBridge import ODSApiPdBridge
 from lib.LocalCSVReader import LocalCSVReader
 from tkinter import *
+import tkinter.ttk as ttk
 import os
 
 
@@ -44,12 +45,33 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
         self.views = {}
         self.addView( name = "accueil", bg = self.coul( "darkBg" ) )
         filesList = self.listFiles()
-        print( len( filesList ) )
-        self.filesListBox = Listbox ( self.views[ "accueil" ] )
+
+        self.datasetsTree = ttk.Treeview ( self.views[ "accueil" ] )
+        self.datasetsTree["columns"]=( "one", "two", "three" )
+        self.datasetsTree.column( "#0", width = 100, minwidth = 100, stretch = YES )
+        self.datasetsTree.heading( "#0", text = "Name", anchor = W )
+
+        self.datasetsTree.column( "one", width = 250, minwidth = 250, stretch = YES )
+        self.datasetsTree.heading( "one", text = "Titre", anchor = W )
+
+        self.datasetsTree.column( "two", width = 250, minwidth = 250, stretch = YES )
+        self.datasetsTree.heading( "two", text = "Nb Enregistrements", anchor = W )
+
+        self.datasetsTree.column( "three", width = 250, minwidth = 250, stretch = YES )
+        self.datasetsTree.heading( "three", text = "Dernier Enregistrement", anchor = W )
+
+        self.datasetsTree.insert( "", "1", text = "Fichiers locaux", values = ( "val1", "val2", "val3" ) )
+        for idx, f in enumerate( filesList ) :
+            cols = self.getFileColumns( f )
+            if len( cols ) >= 3 :
+                self.datasetsTree.insert( "'1'", idx, values = ( str( cols[ 0 ] ), str( cols[ 1 ] ), str( cols[ 2 ] ) ) )
+        #tree.insert("" , 0,    text="Line 1", values=("1A","1b"))
+        '''
         for idx, filePath in enumerate( filesList ) :
             print( os.path.split( filePath )[ 1 ] )
             self.filesListBox.insert( idx, os.path.split( filePath )[ 1 ] )
-        self.filesListBox.pack()
+        '''
+        self.datasetsTree.pack()
         self.openView( "accueil" )
 
 

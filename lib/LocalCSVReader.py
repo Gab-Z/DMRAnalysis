@@ -17,5 +17,12 @@ class LocalCSVReader() :
         ret = []
         for srcDir in self.srcDirs :
             for fileName in self.listDir( targetDirName = srcDir ) :
-                ret.append( fileName  )       
+                ret.append( fileName  )
         return ret
+
+    def openFile( self, filePath ) :
+        df = pd.read_csv( filePath, sep = ";" )
+        return df
+
+    def getFileColumns( self, filePath ) :
+        return self.openFile( filePath ).columns
