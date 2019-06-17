@@ -3,7 +3,8 @@ from lib.LocalCSVReader import LocalCSVReader
 from tkinter import *
 import tkinter.ttk as ttk
 import os
-
+import datetime
+import dateutil.parser as dateParser
 
 class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
 
@@ -47,24 +48,31 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
         filesList = self.listFiles()
 
         self.datasetsTree = ttk.Treeview ( self.views[ "accueil" ] )
-        self.datasetsTree[ "columns" ]=( "one", "two", "three" )
-        self.datasetsTree.column( "#0", width = 200, minwidth = 200, stretch = YES )
-        self.datasetsTree.heading( "#0", text = "Titre", anchor = W )
-        self.datasetsTree.column( "one", width = 350, minwidth = 250, stretch = YES )
-        self.datasetsTree.heading( "one", text = "datasetid", anchor = W )
-        self.datasetsTree.column( "two", width = 100, minwidth = 50, stretch = YES )
-        self.datasetsTree.heading( "two", text = "Nb Enregistrements", anchor = W )
-        self.datasetsTree.column( "three", width = 100, minwidth = 50, stretch = YES )
-        self.datasetsTree.heading( "three", text = "Dernier Enregistrement", anchor = W )
+
+
+        #self.datasetsTree[ "columns" ]=( "one", "two", "three" )
+        datasetColTitles = self.getDatasetsColumnsTitle().copy() # [ 'nomCol1, 'nomCol2', 'nomCol3',... ]
+        colsTitlesAndNum = [ colKey + "_" + str( idx ) for idx, colKey in enumerate( datasetColTitles ) ] # [ 'nomCol1_0',' 'nomCol2_1', 'nomCol3_2',...]
+        self.datasetsTree[ "columns" ] = colsTitlesAndNum[ 1:: ] # [ 'nomCol2_1', 'nomCol3_2',...]
+        colsTitlesAndNum[ 0 ] = "#0" # [ '#0', 'nomCol2_1', 'nomCol3_2',...]
+        for idx, colName in enumerate( colsTitlesAndNum ) :
+            self.datasetsTree.column( colName, stretch = YES )
+            self.datasetsTree.heading( colName, text = datasetColTitles[ idx ], anchor = W )
+
 
         vsb = ttk.Scrollbar( self.views[ "accueil" ], orient = "vertical", command = self.datasetsTree.yview )
         vsb.pack( side = 'right', fill = 'y' )
         self.datasetsTree.configure( yscrollcommand = vsb.set )
 
         dfDatasets = self.getDatasetsInfo( rows = "all" )
-        dfDatasets.sort_values( by = "Jeu de données", kind = 'mergesort', inplace = True )
-        for idx, row in dfDatasets.iterrows() :
-            self.datasetsTree.insert( "", idx + 1, text = row[ 'Jeu de données' ], values = ( row[ "datasetid" ], row[ "Nb enregistrements" ] ) )
+        if type( dfDatasets ) != ODSApiPdBridge.BadRequestResponse :
+            dfDatasets.sort_values( by = self.getColumnSortingPriority(), kind = 'mergesort', inplace = True )
+            for idx, row in dfDatasets.iterrows() :
+                #self.datasetsTree.insert( "", idx + 1, values = ( row[ "datasetid" ], row[ "Enregistrements" ] ) )
+                self.datasetsTree.insert( "", idx + 1,
+                    text = self.adjustFormat( row[ datasetColTitles[ 0 ] ] ),
+                    values = [ self.adjustFormat( row[ colTitle ] ) for colTitle in datasetColTitles[ 1 :: ] ]
+                )
 
 
 
@@ -114,3 +122,10 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
         #self.views[ viewName ].grid( row = 0, column = 0, padx = 0, pady = 0, sticky = "nw" )
         self.views[ viewName ].pack( expand=YES, fill=BOTH )
         #self.views[ viewName ].scale("all",0,0,wscale,hscale)
+
+    def adjustFormat( self, data ) :
+        try :
+            date = dateParser.parse( data ) #, '%Y-%m-%d%Z:%H:%M+%H:%M'
+            return date.strftime( '%d/%m/%Y' )
+        except :
+            return data

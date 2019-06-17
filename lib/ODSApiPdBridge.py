@@ -7,6 +7,7 @@ if sys.version_info[0] < 3:
 else:
     from io import StringIO
 import re
+from pprint import pprint
 
 
 class ODSApiPdBridge() :
@@ -22,17 +23,26 @@ class ODSApiPdBridge() :
     apiVersions     = ( "1.0", "2.0" )
     urlRegEx        = re.compile( "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+" )
     datasetsColumns = {
+        'metas.title' : {
+            'enteteDeColonne' : 'Jeu de données',
+            'sortPriority'    : 1
+        },
+        'metas.records_count' : {
+            'enteteDeColonne' : 'Enregistrements'
+        },
         'datasetid' : {
             'enteteDeColonne' : 'datasetid'
         },
-        'metas.title' : {
-            'enteteDeColonne' : 'Jeu de données'
-        },
-        'metas.records_count' :{
-            'enteteDeColonne' : 'Nb enregistrements'
+        'metas.data_processed' : {
+            'enteteDeColonne' : 'Modifié le'
         }
     }
     datasetsColumnsTitles = [ dc[ 'enteteDeColonne' ] for dc in datasetsColumns.values() ]
+
+    class BadRequestResponse() :
+        def __init__( self, code ) :
+            self.code = code
+
 
     def __init__( self, apiUrl = None, apiVersion = "1.0", responseFormat = "json" ) :
 
@@ -123,9 +133,22 @@ class ODSApiPdBridge() :
     # FIN DES DÉFINITIONS DES GETTERS ET SETTERS
     #########################################################
 
+    def getDatasetsColumnsTitle( self ) :
+        return ODSApiPdBridge.datasetsColumnsTitles
+
+    def getColumnSortingPriority( self ) :
+        ret = []
+        for k in ODSApiPdBridge.datasetsColumns.keys() :
+            if 'sortPriority' in ODSApiPdBridge.datasetsColumns[ k ] :
+                ret.append( ( ODSApiPdBridge.datasetsColumns[ k ][ 'sortPriority' ] , ODSApiPdBridge.datasetsColumns[ k ][ 'enteteDeColonne' ] ) )
+        ret.sort( key = lambda tup: tup[ 0 ] )
+        print( ret )
+        return [ t[ 1 ] for t in ret ]
+
     def get( self, _apiEntry , _apiTool, _params = None ) :
+        req = 0
         if type( _params ) == dict :
-            return  requests.get(
+            req = requests.get(
                         "{apiUrl}{apiEntry}/{apiVersion}/{apiTool}".format(
                             apiUrl      = self.apiUrl,
                             apiEntry    = _apiEntry,
@@ -134,7 +157,7 @@ class ODSApiPdBridge() :
                         ),params = _params
             )
         else :
-            return  requests.get(
+            req = requests.get(
                         "{apiUrl}{apiEntry}/{apiVersion}/{apiTool}".format(
                             apiUrl      = self.apiUrl,
                             apiEntry    = _apiEntry,
@@ -142,6 +165,10 @@ class ODSApiPdBridge() :
                             apiTool     = _apiTool
                         )
                     )
+        if str( req.status_code ) == "200":
+            return req
+        else :
+            return ODSApiPdBridge.BadRequestResponse( code = req.status_code )
 
     def csvFormatToDf( self, csv, sep = ";" ) :
         return pd.read_csv( StringIO( csv.text ), sep = sep )
@@ -171,7 +198,10 @@ class ODSApiPdBridge() :
                           "rows"     : "0"
                         }
         )
-        return req.json()[ "nhits" ]
+        if type( req ) != ODSApiPdBridge.BadRequestResponse :
+            return req.json()[ "nhits" ]
+        else :
+            return req
 
 
     def getDatasets(    self, start = 0, rows = 10, format = None,
@@ -187,33 +217,31 @@ class ODSApiPdBridge() :
                 "start"   : str( start )
             }
         )
-        if raw == False :
-            '''
-            return self.convertToDfByFormat(
-                data    = data,
-                format  = frmt,
-                sep     = sep
-            )
-            '''
-            return json_normalize(  data = data.json()[ "datasets" ],
-                                    #record_path = ["datasetid", "has_records"]
-                                    meta = "metas"
-
-            )
-
+        if type( data ) == ODSApiPdBridge.BadRequestResponse :
+            return data
         else :
-            if frmt == "csv" :
-                return data.text
-            elif frmt == "json" :
-                return data.json()
+            if raw == False :
+                return json_normalize(  data = data.json()[ "datasets" ],
+                                        #record_path = ["datasetid", "has_records"]
+                                        meta = "metas"
+
+                )
+            else :
+                if frmt == "csv" :
+                    return data.text
+                elif frmt == "json" :
+                    return data.json()
 
 
     def getDatasetsInfo( self, start = 0, rows = 10 ) :
         if rows == "all" :
             rows = int( self.getNbDatasets() )
-        df = self.getDatasets(
+        data = self.getDatasets(
             start = start,
-            rows = rows )[ ODSApiPdBridge.datasetsColumns.keys() ]
+            rows = rows )
+        if type( data ) == ODSApiPdBridge.BadRequestResponse :
+            return data
+        df = data[ ODSApiPdBridge.datasetsColumns.keys() ]
         df.columns = ODSApiPdBridge.datasetsColumnsTitles
         return df
 
@@ -237,6 +265,8 @@ class ODSApiPdBridge() :
             _apiTool    =   "search",
             _params     =   parametres
         )
+        if type( data ) == ODSApiPdBridge.BadRequestResponse :
+            return data
 
         if raw == False :
             return self.convertToDfByFormat(
