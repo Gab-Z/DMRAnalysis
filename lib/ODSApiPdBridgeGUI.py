@@ -47,31 +47,47 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
         filesList = self.listFiles()
 
         self.datasetsTree = ttk.Treeview ( self.views[ "accueil" ] )
-        self.datasetsTree["columns"]=( "one", "two", "three" )
+        self.datasetsTree[ "columns" ]=( "one", "two", "three" )
         self.datasetsTree.column( "#0", width = 100, minwidth = 100, stretch = YES )
         self.datasetsTree.heading( "#0", text = "Name", anchor = W )
-
         self.datasetsTree.column( "one", width = 250, minwidth = 250, stretch = YES )
         self.datasetsTree.heading( "one", text = "Titre", anchor = W )
-
         self.datasetsTree.column( "two", width = 250, minwidth = 250, stretch = YES )
         self.datasetsTree.heading( "two", text = "Nb Enregistrements", anchor = W )
-
         self.datasetsTree.column( "three", width = 250, minwidth = 250, stretch = YES )
         self.datasetsTree.heading( "three", text = "Dernier Enregistrement", anchor = W )
+        datasets = self.getDatasets()
+        print( datasets )
 
-        self.datasetsTree.insert( "", "1", text = "Fichiers locaux", values = ( "val1", "val2", "val3" ) )
+
+
+        self.fichiersTree =  ttk.Treeview ( self.views[ "accueil" ] )
+        self.fichiersTree["columns"]=( "one", "two" )
+        self.fichiersTree.column( "#0", width = 100, minwidth = 100, stretch = YES )
+        self.fichiersTree.heading( "#0", text = "Nom de fichier", anchor = W )
+        self.fichiersTree.column( "one", width = 100, minwidth = 100, stretch = YES )
+        self.fichiersTree.heading( "one", text = "Nb Enregistrements", anchor = W )
+        self.fichiersTree.column( "two", width = 350, minwidth = 250, stretch = YES )
+        self.fichiersTree.heading( "two", text = "Colonnes", anchor = W )
+
+
+        #self.brancheLocale = self.datasetsTree.insert( "", 1, text = "Fichiers locaux" )
+        #self.brancheDistante = self.datasetsTree.insert( "", 1, text = "Jeux de données distants" )
         for idx, f in enumerate( filesList ) :
             cols = self.getFileColumns( f )
             if len( cols ) >= 3 :
-                self.datasetsTree.insert( "'1'", idx, values = ( str( cols[ 0 ] ), str( cols[ 1 ] ), str( cols[ 2 ] ) ) )
+                self.fichiersTree.insert( "", idx + 1, text =  os.path.split( f )[ 1 ], values = ( 0, ", ".join( cols) ) )
+
+
+
         #tree.insert("" , 0,    text="Line 1", values=("1A","1b"))
         '''
         for idx, filePath in enumerate( filesList ) :
             print( os.path.split( filePath )[ 1 ] )
             self.filesListBox.insert( idx, os.path.split( filePath )[ 1 ] )
         '''
-        self.datasetsTree.pack()
+        self.datasetsTree.pack( expand=YES, fill=BOTH )
+        self.fichiersTree.pack( expand=YES, fill=BOTH )
         self.openView( "accueil" )
 
 

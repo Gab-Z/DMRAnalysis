@@ -1,6 +1,7 @@
 import pandas as pd
 import os
-
+import sys
+sys._enablelegacywindowsfsencoding()
 
 class LocalCSVReader() :
 
@@ -21,7 +22,9 @@ class LocalCSVReader() :
         return ret
 
     def openFile( self, filePath ) :
-        df = pd.read_csv( filePath, sep = ";" )
+        print("file : " + filePath )
+        print( str( os.path.exists( filePath ) ) )
+        df = pd.read_csv( os.path.realpath( filePath ), sep = ";", header = 0 )
         return df
 
     def getFileColumns( self, filePath ) :
