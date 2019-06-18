@@ -44,50 +44,58 @@ class ODSApiPdBridge() :
             self.code = code
 
 
-    def __init__( self, apiUrl = None, apiVersion = "1.0", responseFormat = "json" ) :
-
-        if apiUrl != None :
-            if apiUrl[ len( str( apiUrl ) ) - 4 :: ] == "api" :
-                apiUrl += "/"
-            if apiUrl[ len( str( apiUrl ) ) - 6 ::] != "/api/" :
-                apiUrl += "/api/"
+    def __init__( self, apiUrls = None, apiVersion = "1.0", responseFormat = "json" ) :
 
         # INITIALISATION DES PROPRIÉTÉS PRIVÉES
-        self._private_apiUrl        = ""
+        self._private_apiUrls        = []
         self._private_format        = ""
         self._private_apiVersion    = ""
 
         # AFFECTATION DES ARGUMENTS CONSTRUCTEUR AUX PROPRIÉTÉS PRIVÉES
-        self.apiUrl         = apiUrl            # Correspond à '_private_apiUrl'
+        #self.apiUrls         = apiUrls            # Correspond à '_private_apiUrls'
+        self.addUrl( apiUrls )
         self.format         = responseFormat    # Correspond à '_private_format'
         self.apiVersion     = apiVersion        # Correspond à '_private_apiVersion'
-
-        # Vérification de la chaîne 'apiUrl' et ajout de '/api/' si nécessaire
-
 
     #########################################################
     # DÉFINITIONS DES GETTERS ET SETTERS
     #########################################################
 
-    # PUBLIC : 'apiUrl' / PRIVÉ : '_private_apiUrl'
+    # PUBLIC : 'apiUrls' / PRIVÉ : '_private_apiUrls'
     @property
-    def apiUrl( self ) :
-        return self._private_apiUrl
+    def apiUrls( self ) :
+        return self._private_apiUrls
 
-    @apiUrl.setter
-    def apiUrl( self, value ) :
+    @apiUrls.setter
+    def apiUrls( self, value ) :
         if value == None :
-            self._private_apiUrl = None
+            self._private_apiUrls = None
         else :
             match = ODSApiPdBridge.urlRegEx.match( str( value ) )
             if match == None :
                 raise ValueError(
-                    ( "Erreur : la valeur affectée à la propriété 'apiUrl' : "
+                    ( "Erreur : la valeur affectée à la propriété 'apiUrls' : "
                       + "{valeurRecue} n'est pas une URL valide." ).format(
                         valeurRecue = str( value )
                     )
                 )
-            self._private_apiUrl = str( value )
+            self._private_apiUrls = str( value )
+
+    def addUrl( self, apiUrl ) :
+        if type( apiUrl ) != list :
+            apiUrl = [ apiUrl ]
+        for url in apiUrl :
+            if type( url ) != str :
+                raise ValueError(
+                    "Erreur : un élément passé à la méthode 'addUrl' ({}) "
+                    + "n'est pas de type str".format( str( url ) )
+                )
+            if url[ len( str( url ) ) - 4 :: ] == "api" :
+                url += "/"
+            if url[ len( str( url ) ) - 6 ::] != "/api/" :
+                url += "/api/"
+            self.apiUrls.append( url )
+            print( self.apiUrls )
 
     # PUBLIC : 'format' / PRIVÉ : '_private_format'
     @property
@@ -145,24 +153,24 @@ class ODSApiPdBridge() :
         print( ret )
         return [ t[ 1 ] for t in ret ]
 
-    def get( self, _apiEntry , _apiTool, _params = None ) :
+    def get( self, apiUrl, apiEntry , apiTool, params = None ) :
         req = 0
-        if type( _params ) == dict :
+        if type( params ) == dict :
             req = requests.get(
                         "{apiUrl}{apiEntry}/{apiVersion}/{apiTool}".format(
-                            apiUrl      = self.apiUrl,
-                            apiEntry    = _apiEntry,
+                            apiUrl     = apiUrl,
+                            apiEntry    = apiEntry,
                             apiVersion  = self.apiVersion,
-                            apiTool     = _apiTool
-                        ),params = _params
+                            apiTool     = apiTool
+                        ),params = params
             )
         else :
             req = requests.get(
                         "{apiUrl}{apiEntry}/{apiVersion}/{apiTool}".format(
-                            apiUrl      = self.apiUrl,
-                            apiEntry    = _apiEntry,
+                            apiUrl     = apiUrl,
+                            apiEntry    = apiEntry,
                             apiVersion  = self.apiVersion,
-                            apiTool     = _apiTool
+                            apiTool     = apiTool
                         )
                     )
         if str( req.status_code ) == "200":
@@ -190,10 +198,11 @@ class ODSApiPdBridge() :
             return self.jsonFormatToDf( json = data, recordsKey = recordsKey )
 
 
-    def getNbDatasets( self ) :
-        req = self.get( _apiEntry   = "datasets",
-                        _apiTool    = "search",
-                        _params     =   {
+    def getNbDatasets( self, apiUrl ) :
+        req = self.get( apiUrl     = apiUrl,
+                        apiEntry   = "datasets",
+                        apiTool    = "search",
+                        params     =   {
                           "format"   : "json",
                           "rows"     : "0"
                         }
@@ -204,11 +213,12 @@ class ODSApiPdBridge() :
             return req
 
 
-    def getDatasets(    self, start = 0, rows = 10, format = None,
-                        sep = ";", raw = False ) :
+    def getDatasets(    self, apiUrl = "", start = 0, rows = 10,
+                        format = None, sep = ";", raw = False ) :
 
         frmt = format if format != None else self.format
         data = self.get(
+            _apiUrl     =   apiUrl,
             _apiEntry   =   "datasets",
             _apiTool    =   "search",
             _params     =   {
@@ -224,7 +234,6 @@ class ODSApiPdBridge() :
                 return json_normalize(  data = data.json()[ "datasets" ],
                                         #record_path = ["datasetid", "has_records"]
                                         meta = "metas"
-
                 )
             else :
                 if frmt == "csv" :
@@ -233,12 +242,13 @@ class ODSApiPdBridge() :
                     return data.json()
 
 
-    def getDatasetsInfo( self, start = 0, rows = 10 ) :
+    def getDatasetsInfo( self, apiUrl = "", start = 0, rows = 10 ) :
         if rows == "all" :
-            rows = int( self.getNbDatasets() )
+            rows = int( self.getNbDatasets( apiUrl = apiUrl ) )
         data = self.getDatasets(
-            start = start,
-            rows = rows )
+            apiUrl  = apiUrl,
+            start   = start,
+            rows    = rows )
         if type( data ) == ODSApiPdBridge.BadRequestResponse :
             return data
         df = data[ ODSApiPdBridge.datasetsColumns.keys() ]
@@ -246,7 +256,7 @@ class ODSApiPdBridge() :
         return df
 
 
-    def getRecords( self, dataset, start = 0, rows = 10, format = None,
+    def getRecords( self, apiUrl, dataset, start = 0, rows = 10, format = None,
                     sep = ";", recordsKey = None, params = {}, raw = False ) :
 
         frmt = format if format != None else self.format
@@ -261,9 +271,10 @@ class ODSApiPdBridge() :
             parametres[ k ] = str( params[ k ] )
 
         data = self.get(
-            _apiEntry   =   "records",
-            _apiTool    =   "search",
-            _params     =   parametres
+            apiUrl     =   apiUrl,
+            apiEntry   =   "records",
+            apiTool    =   "search",
+            params     =   parametres
         )
         if type( data ) == ODSApiPdBridge.BadRequestResponse :
             return data

@@ -20,10 +20,10 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
     }
 
 
-    def __init__( self, apiUrl = None, apiVersion = "1.0", responseFormat = "json", localDirs = [] ) :
+    def __init__( self, apiUrls = None, apiVersion = "1.0", responseFormat = "json", localDirs = [] ) :
 
         ODSApiPdBridge.__init__(
-            self, apiUrl = apiUrl, apiVersion = apiVersion,
+            self, apiUrls = apiUrls, apiVersion = apiVersion,
             responseFormat = responseFormat
         )
 
@@ -129,3 +129,30 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
             return date.strftime( '%d/%m/%Y' )
         except :
             return data
+
+    def addRemoteTreeview( self, parent ) :
+        tree = ttk.Treeview ( parent )
+        #self.datasetsTree[ "columns" ]=( "one", "two", "three" )
+        datasetColTitles = self.getDatasetsColumnsTitle().copy() # [ 'nomCol1, 'nomCol2', 'nomCol3',... ]
+        colsTitlesAndNum = [ colKey + "_" + str( idx ) for idx, colKey in enumerate( datasetColTitles ) ] # [ 'nomCol1_0',' 'nomCol2_1', 'nomCol3_2',...]
+        tree[ "columns" ] = colsTitlesAndNum[ 1:: ] # [ 'nomCol2_1', 'nomCol3_2',...]
+        colsTitlesAndNum[ 0 ] = "#0" # [ '#0', 'nomCol2_1', 'nomCol3_2',...]
+        for idx, colName in enumerate( colsTitlesAndNum ) :
+            tree.column( colName, stretch = YES )
+            tree.heading( colName, text = datasetColTitles[ idx ], anchor = W )
+
+        vsb = ttk.Scrollbar( parent, orient = "vertical", command = tree.yview )
+        vsb.pack( side = 'right', fill = 'y' )
+        tree.configure( yscrollcommand = vsb.set )
+
+        for urlIdx, url in enumerate( self.apiUrls ) :
+            dfDatasets = self.getDatasetsInfo( apiUrl = url, rows = "all" )
+            folderRow = tree.insert( "", urlIdx, text = url )
+            if type( dfDatasets ) != ODSApiPdBridge.BadRequestResponse :
+                dfDatasets.sort_values( by = self.getColumnSortingPriority(), kind = 'mergesort', inplace = True )
+                for idx, row in dfDatasets.iterrows() :
+                    #self.datasetsTree.insert( "", idx + 1, values = ( row[ "datasetid" ], row[ "Enregistrements" ] ) )
+                    tree.insert( folderRow, idx + 1,
+                        text = self.adjustFormat( row[ datasetColTitles[ 0 ] ] ),
+                        values = [ self.adjustFormat( row[ colTitle ] ) for colTitle in datasetColTitles[ 1 :: ] ]
+                    )
