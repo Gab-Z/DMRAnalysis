@@ -11,25 +11,35 @@
 
 import pandas
 import csv
-import numpy as np
-import matplotlib.pyplot as plt
-import tkinter
+from tkinter import *
 
-def main():
-    pass
+
+class Checkbar(Frame):
+   def __init__(self, parent=None, picks=[], side=LEFT, anchor=W):
+      Frame.__init__(self, parent)
+      self.vars = []
+      for pick in picks:
+         var = IntVar()
+         chk = Checkbutton(self, text=pick, variable=var)
+         chk.pack(side=side, anchor=anchor, expand=YES)
+         self.vars.append(var)
+   def state(self):
+      return map((lambda var: var.get()), self.vars)
 
 if __name__ == '__main__':
-    main()
+   root = Tk()
+   lng = Checkbar(root, ['2012', '2013', '2014', '2015'])
+   lng.pack(side=TOP,  fill=X)
+   lng.config(relief=GROOVE, bd=2)
 
-df=pandas.read_csv("dans-ma-rue.csv", sep='\t', delimiter=';', header=0)
+   def allstates():
+      print(list(lng.state()))
 
-root = tkinter.Tk()
+   Button(root, text='Quit', command=root.destroy).pack(side=RIGHT)
+   Button(root, text='Peek', command=allstates).pack(side=RIGHT)
 
-obj = tkinter.Label (text = "zone de texte")
+   root.mainloop()
 
-obj.pack()
-
-root.mainloop()
 
 
 
