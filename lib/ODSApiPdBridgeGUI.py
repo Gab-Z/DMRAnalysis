@@ -5,6 +5,7 @@ import tkinter.ttk as ttk
 import os
 import datetime
 import dateutil.parser as dateParser
+from functools import partial
 
 class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
 
@@ -79,15 +80,16 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
         menuBtCont = Frame( menuFrame, height = 50, bg = self.coul( "defaultBg" ), borderwidth = 0, highlightthickness = 0 )
         #menuBtCont.place( relx = 0.5, rely = 0.5, anchor = "w" )
         menuBtCont.grid( column = 6, row = 0  )
-        validButton = Button( menuBtCont, text = "Ouvrir un jeu de données" )
+        validButton = Button( menuBtCont, text = "Ouvrir un jeu de données", command = self.openDataset )
         validButton.grid( column = 0, row = 0, padx = 10, sticky = "e")
 
         remoteFrame = Frame( parent,  width = 100, height = 100, bg = self.coul( "defaultBg" ), borderwidth = 0, highlightthickness = 0 )
         remoteFrame.pack( expand = YES, fill = BOTH, anchor = "ne", side = TOP )
         remoteTree = self.addRemoteTreeview( parent = remoteFrame )
         return {
-            'frame' : remoteFrame,
-            'tree'  : remoteTree
+            'frame'    : remoteFrame,
+            'tree'     : remoteTree,
+            'textArea' : txtArea
         }
 
     def addRemoteTreeview( self, parent ) :
@@ -208,3 +210,21 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
             if len( cols ) >= 3 :
                 tree.insert( "", idx + 1, text = os.path.split( f )[ 1 ], values = ( rows, ", ".join( cols ) ) )
         return tree
+
+    def openDataset( self ) :
+        tree = self.browserTrees[ 'tree' ]
+        if len( tree.selection() ) != 1 :
+            textArea = self.browserTrees[ 'textArea' ]
+            self.writeLog( textArea, "Veuillez sélectionner un dataset dans la liste" )
+            self.after( 3, partial( lambda a : self.clearLog, textArea = textArea ) )
+
+    def writeLog( self, textArea, txt ) :
+        textArea.config( state = NORMAL )
+        textArea.delete( 1.0, END )
+        textArea.insert( END, txt )
+        textArea.config( state = DISABLED )
+
+    def clearLog( self, textArea ) :
+        textArea.config( state = NORMAL )
+        textArea.delete( 1.0, END )
+        textArea.config( state = DISABLED )
