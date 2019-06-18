@@ -7,6 +7,7 @@ if sys.version_info[0] < 3:
 else:
     from io import StringIO
 import re
+import json
 from pprint import pprint
 
 
@@ -35,6 +36,10 @@ class ODSApiPdBridge() :
         },
         'metas.data_processed' : {
             'enteteDeColonne' : 'Modifié le'
+        },
+        'fields'               : {
+            'enteteDeColonne' : 'Colonnes',
+            'cléDesDictsMembres' : 'label'
         }
     }
     datasetsColumnsTitles = [ dc[ 'enteteDeColonne' ] for dc in datasetsColumns.values() ]
@@ -155,28 +160,31 @@ class ODSApiPdBridge() :
 
     def get( self, apiUrl, apiEntry , apiTool, params = None ) :
         req = 0
-        if type( params ) == dict :
-            req = requests.get(
-                        "{apiUrl}{apiEntry}/{apiVersion}/{apiTool}".format(
-                            apiUrl     = apiUrl,
-                            apiEntry    = apiEntry,
-                            apiVersion  = self.apiVersion,
-                            apiTool     = apiTool
-                        ),params = params
-            )
-        else :
-            req = requests.get(
-                        "{apiUrl}{apiEntry}/{apiVersion}/{apiTool}".format(
-                            apiUrl     = apiUrl,
-                            apiEntry    = apiEntry,
-                            apiVersion  = self.apiVersion,
-                            apiTool     = apiTool
-                        )
+        try :
+            if type( params ) == dict :
+                req = requests.get(
+                            "{apiUrl}{apiEntry}/{apiVersion}/{apiTool}".format(
+                                apiUrl     = apiUrl,
+                                apiEntry    = apiEntry,
+                                apiVersion  = self.apiVersion,
+                                apiTool     = apiTool
+                            ),params = params
+                )
+            else :
+                req = requests.get(
+                            "{apiUrl}{apiEntry}/{apiVersion}/{apiTool}".format(
+                                apiUrl     = apiUrl,
+                                apiEntry    = apiEntry,
+                                apiVersion  = self.apiVersion,
+                                apiTool     = apiTool
+                            )
                     )
-        if str( req.status_code ) == "200":
-            return req
-        else :
-            return ODSApiPdBridge.BadRequestResponse( code = req.status_code )
+            if str( req.status_code ) == "200":
+                return req
+            else :
+                return ODSApiPdBridge.BadRequestResponse( code = req.status_code )
+        except :
+            return ODSApiPdBridge.BadRequestResponse( code = 504 )
 
     def csvFormatToDf( self, csv, sep = ";" ) :
         return pd.read_csv( StringIO( csv.text ), sep = sep )
@@ -199,13 +207,14 @@ class ODSApiPdBridge() :
 
 
     def getNbDatasets( self, apiUrl ) :
-        req = self.get( apiUrl     = apiUrl,
-                        apiEntry   = "datasets",
-                        apiTool    = "search",
-                        params     =   {
-                          "format"   : "json",
-                          "rows"     : "0"
-                        }
+        req = self.get(
+            apiUrl     = apiUrl,
+            apiEntry   = "datasets",
+            apiTool    = "search",
+            params     =   {
+              "format"   : "json",
+              "rows"     : "0"
+            }
         )
         if type( req ) != ODSApiPdBridge.BadRequestResponse :
             return req.json()[ "nhits" ]
@@ -218,10 +227,10 @@ class ODSApiPdBridge() :
 
         frmt = format if format != None else self.format
         data = self.get(
-            _apiUrl     =   apiUrl,
-            _apiEntry   =   "datasets",
-            _apiTool    =   "search",
-            _params     =   {
+            apiUrl     =   apiUrl,
+            apiEntry   =   "datasets",
+            apiTool    =   "search",
+            params     =   {
                 "format"  : str( frmt ),
                 "rows"    : str( rows ),
                 "start"   : str( start )
@@ -229,30 +238,51 @@ class ODSApiPdBridge() :
         )
         if type( data ) == ODSApiPdBridge.BadRequestResponse :
             return data
+
+        if raw == False :
+            return json_normalize(  data = data.json()[ "datasets" ],
+                                    #record_path = ["fields"],
+                                    meta = [["metas" ],["fields"]]
+            )
         else :
-            if raw == False :
-                return json_normalize(  data = data.json()[ "datasets" ],
-                                        #record_path = ["datasetid", "has_records"]
-                                        meta = "metas"
-                )
-            else :
-                if frmt == "csv" :
-                    return data.text
-                elif frmt == "json" :
-                    return data.json()
+            if frmt == "csv" :
+                return data.text
+            elif frmt == "json" :
+                return data.json()
 
 
     def getDatasetsInfo( self, apiUrl = "", start = 0, rows = 10 ) :
         if rows == "all" :
-            rows = int( self.getNbDatasets( apiUrl = apiUrl ) )
+            nbDatasets = self.getNbDatasets( apiUrl = apiUrl )
+            if type( nbDatasets ) == ODSApiPdBridge.BadRequestResponse :
+                return nbDatasets
+            rows = int( nbDatasets )
         data = self.getDatasets(
             apiUrl  = apiUrl,
             start   = start,
             rows    = rows )
         if type( data ) == ODSApiPdBridge.BadRequestResponse :
             return data
-        df = data[ ODSApiPdBridge.datasetsColumns.keys() ]
+
+        df = data[ [ k for k in ODSApiPdBridge.datasetsColumns.keys() ] ]
         df.columns = ODSApiPdBridge.datasetsColumnsTitles
+        shape = df.shape
+        for k in ODSApiPdBridge.datasetsColumns.keys() :
+            datasetsCol = ODSApiPdBridge.datasetsColumns[ k ]
+            if 'cléDesDictsMembres' in datasetsCol :
+                nomCol = datasetsCol[ 'enteteDeColonne' ]
+                jsonProp = datasetsCol['cléDesDictsMembres' ]
+                nRo = 0
+                for r in range( shape[ 0 ] ) :
+                    elList =  df.at[ r, nomCol ]
+                    retL = []
+                    for dct in elList :
+                        if jsonProp in dct :
+                            retL.append( dct[ jsonProp ] )
+                        #str = df.at[ r, nomCol ] #row[ [ nomCol ] ]
+                        #jsoned = json.loads( str )
+                    df.at[ r, nomCol ] = ", ".join( retL )
+
         return df
 
 

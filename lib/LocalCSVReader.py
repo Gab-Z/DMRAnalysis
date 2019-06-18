@@ -28,6 +28,3 @@ class LocalCSVReader() :
         print( str( os.path.exists( filePath ) ) )
         df = pd.read_csv( os.path.realpath( filePath ), sep = ";", header = 0 )
         return df
-
-    def getFileColumns( self, filePath ) :
-        return self.openFile( filePath ).columns
