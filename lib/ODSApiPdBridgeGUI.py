@@ -91,6 +91,11 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
         remoteFrame = Frame( parent,  width = 100, height = 100, bg = self.coul( "defaultBg" ), borderwidth = 0, highlightthickness = 0 )
         remoteFrame.pack( expand = YES, fill = BOTH, anchor = "ne", side = TOP )
         remoteTree = self.addTreeview( parent = remoteFrame )
+
+        loaderCont =  Frame( parent, height = 50, bg = self.coul( "defaultBg" ), borderwidth = 0, highlightthickness = 0 )
+        loaderCont.pack( expand = YES, fill = BOTH, anchor = "ne", side = TOP )
+        self.progressBar = ttk.Progressbar( loaderCont, mode = 'indeterminate' )
+        self.progressBar.place( relx = 0.5, rely = 0.5, anchor = "c" )
         return {
             'frame'    : remoteFrame,
             'tree'     : remoteTree,
