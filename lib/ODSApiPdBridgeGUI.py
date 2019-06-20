@@ -1,6 +1,5 @@
 from lib.ODSApiPdBridge import ODSApiPdBridge
 from lib.LocalCSVReader import LocalCSVReader
-from lib.badRequestResponse import BadRequestResponse
 from tkinter import *
 import tkinter.ttk as ttk
 import os
@@ -15,8 +14,7 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
             "defaultBg"     : "#e0e0e0",
             "darkBg"        : "#606060",
             "brightBg"      : "#e0cf9a",
-            "defaultFont"   : "#343434",
-            'hotBg'         : '#dbde44'
+            "defaultFont"   : "#343434"
         },
         "polices" : {
             "default"       : "Courier 12"
@@ -90,24 +88,9 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
         validButton = Button( menuBtCont, text = "Ouvrir un jeu de données", command = self.selectDataset )
         validButton.grid( column = 0, row = 0, sticky = "ew" )
 
-        remoteFrame = Frame( parent, bg = self.coul( "defaultBg" ), borderwidth = 0, highlightthickness = 0 )
-
-        self.loaderCont =  Frame( parent, height = 30, bg = self.coul( "defaultBg" ), borderwidth = 0, highlightthickness = 0 )
+        remoteFrame = Frame( parent,  width = 100, height = 100, bg = self.coul( "defaultBg" ), borderwidth = 0, highlightthickness = 0 )
         remoteFrame.pack( expand = YES, fill = BOTH, anchor = "ne", side = TOP )
-        self.loaderCont.pack( expand = FALSE, fill = BOTH, anchor = "se", side = BOTTOM )
-        self.loaderCont.pack_propagate( 0 )
-
         remoteTree = self.addTreeview( parent = remoteFrame )
-
-        self.progress = 25
-        self.progressBar = ttk.Progressbar( self.loaderCont,
-                                            mode = 'indeterminate',
-                                            length = 300,
-                                            maximum = 50,
-                                            value = 0,
-                                            variable = self.progress
-        )
-        self.progressBar.place( relx = 0.5, rely = 0.5, anchor = "c" )
         return {
             'frame'    : remoteFrame,
             'tree'     : remoteTree,
@@ -139,7 +122,7 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
         idxCount = 0
         for urlIdx, url in enumerate( self.apiUrls ) :
             dfDatasets = self.getDatasetsInfo( apiUrl = url, rows = "all" )
-            if type( dfDatasets ) != BadRequestResponse :
+            if type( dfDatasets ) != ODSApiPdBridge.BadRequestResponse :
                 folderRow = tree.insert( "", urlIdx, text = url )
                 orderedDf = dfDatasets.sort_values( by = self.getColumnSortingPriority()[ 0 ], kind = 'mergesort', ascending = sortAscending ).reset_index( drop = True )
                 for idx, row in orderedDf.iterrows() :
@@ -188,7 +171,24 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
         if datasetId == ODSApiPdBridgeGUI.datasetKeyForLocalFiles :
             datasetId = curItem[ 'text' ]
             isLocalFile = True
-        self.openDataset( datasetId = datasetId, isLocalFile = isLocalFile, columns = curItem[ 'values' ][ self.getDatasetsColumnsTitle().index( 'Colonnes' ) - 1 ]  )
+
+
+        apiUrl =  tree.item( tree.parent( tree.focus() ) )[ 'text' ]
+
+        enregistrementsPos = datasetIdPos = self.getDatasetsColumnsTitle().index( 'Enregistrements' )
+        nbEnregistrements = 0
+        if enregistrementsPos == 0 :
+            nbEnregistrements = curItem[ 'text' ]
+        else :
+            nbEnregistrements = curItem[ 'values' ][ enregistrementsPos - 1 ]
+
+
+        self.openDataset(
+            datasetId = datasetId, isLocalFile = isLocalFile,
+            columns = curItem[ 'values' ][ self.getDatasetsColumnsTitle().index( 'Colonnes' ) - 1 ],
+            nbEnregistrements = nbEnregistrements,
+            apiUrl = apiUrl
+        )
 
     def writeLog( self, textArea, txt ) :
         textArea.config( state = NORMAL )
@@ -201,23 +201,11 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
         textArea.delete( 1.0, END )
         textArea.config( state = DISABLED )
 
-    def startLoad( self ) :
-        print( "gui start load" )
-        self.progressBar.config( value = 0 )
-        self.progressBar.start( interval = 5 )
-        self.after( 5, self.stepLoad )
-
-    def stepLoad( self ) :
-        self.progressBar.step()
-        self.after( 5, self.stepLoad )
-
-    def endLoad( self ) :
-        print( "gui endload" )
-        self.progressBar.stop()
-        #self.progressBar.destroy()
-
-
-    def openDataset( self, datasetId, isLocalFile, columns ) :
+    def openDataset( self, datasetId, isLocalFile, columns, nbEnregistrements, apiUrl ) :
+        print( "\n" + datasetId + " / " + str( nbEnregistrements ) + "\n" )
         columns = columns.split( ", " )
         print( datasetId + ' ' + str( isLocalFile )+ ' ' + str( columns ) + ' ' + str( type( columns ) ) )
+
+        jsn = self.getRecords( apiUrl, datasetId, start = 0, rows = nbEnregistrements )
+        print( jsn )
         return False
