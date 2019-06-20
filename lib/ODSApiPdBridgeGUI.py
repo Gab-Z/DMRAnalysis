@@ -1,5 +1,6 @@
 from lib.ODSApiPdBridge import ODSApiPdBridge
 from lib.LocalCSVReader import LocalCSVReader
+from lib.badRequestResponse import BadRequestResponse
 from tkinter import *
 import tkinter.ttk as ttk
 import os
@@ -14,7 +15,8 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
             "defaultBg"     : "#e0e0e0",
             "darkBg"        : "#606060",
             "brightBg"      : "#e0cf9a",
-            "defaultFont"   : "#343434"
+            "defaultFont"   : "#343434",
+            'hotBg'         : '#dbde44'
         },
         "polices" : {
             "default"       : "Courier 12"
@@ -88,13 +90,23 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
         validButton = Button( menuBtCont, text = "Ouvrir un jeu de données", command = self.selectDataset )
         validButton.grid( column = 0, row = 0, sticky = "ew" )
 
-        remoteFrame = Frame( parent,  width = 100, height = 100, bg = self.coul( "defaultBg" ), borderwidth = 0, highlightthickness = 0 )
+        remoteFrame = Frame( parent, bg = self.coul( "defaultBg" ), borderwidth = 0, highlightthickness = 0 )
+
+        self.loaderCont =  Frame( parent, height = 30, bg = self.coul( "defaultBg" ), borderwidth = 0, highlightthickness = 0 )
         remoteFrame.pack( expand = YES, fill = BOTH, anchor = "ne", side = TOP )
+        self.loaderCont.pack( expand = FALSE, fill = BOTH, anchor = "se", side = BOTTOM )
+        self.loaderCont.pack_propagate( 0 )
+
         remoteTree = self.addTreeview( parent = remoteFrame )
 
-        loaderCont =  Frame( parent, height = 50, bg = self.coul( "defaultBg" ), borderwidth = 0, highlightthickness = 0 )
-        loaderCont.pack( expand = YES, fill = BOTH, anchor = "ne", side = TOP )
-        self.progressBar = ttk.Progressbar( loaderCont, mode = 'indeterminate' )
+        self.progress = 25
+        self.progressBar = ttk.Progressbar( self.loaderCont,
+                                            mode = 'indeterminate',
+                                            length = 300,
+                                            maximum = 50,
+                                            value = 0,
+                                            variable = self.progress
+        )
         self.progressBar.place( relx = 0.5, rely = 0.5, anchor = "c" )
         return {
             'frame'    : remoteFrame,
@@ -127,7 +139,7 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
         idxCount = 0
         for urlIdx, url in enumerate( self.apiUrls ) :
             dfDatasets = self.getDatasetsInfo( apiUrl = url, rows = "all" )
-            if type( dfDatasets ) != ODSApiPdBridge.BadRequestResponse :
+            if type( dfDatasets ) != BadRequestResponse :
                 folderRow = tree.insert( "", urlIdx, text = url )
                 orderedDf = dfDatasets.sort_values( by = self.getColumnSortingPriority()[ 0 ], kind = 'mergesort', ascending = sortAscending ).reset_index( drop = True )
                 for idx, row in orderedDf.iterrows() :
@@ -188,6 +200,22 @@ class ODSApiPdBridgeGUI( ODSApiPdBridge, LocalCSVReader, Tk ) :
         textArea.config( state = NORMAL )
         textArea.delete( 1.0, END )
         textArea.config( state = DISABLED )
+
+    def startLoad( self ) :
+        print( "gui start load" )
+        self.progressBar.config( value = 0 )
+        self.progressBar.start( interval = 5 )
+        self.after( 5, self.stepLoad )
+
+    def stepLoad( self ) :
+        self.progressBar.step()
+        self.after( 5, self.stepLoad )
+
+    def endLoad( self ) :
+        print( "gui endload" )
+        self.progressBar.stop()
+        #self.progressBar.destroy()
+
 
     def openDataset( self, datasetId, isLocalFile, columns ) :
         columns = columns.split( ", " )

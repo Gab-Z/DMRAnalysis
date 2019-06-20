@@ -9,6 +9,9 @@ else:
 import re
 import json
 from pprint import pprint
+from lib.badRequestResponse import BadRequestResponse
+from lib.threadedRequest import ThreadedRequest
+from requests_threads import AsyncSession
 
 
 class ODSApiPdBridge() :
@@ -25,7 +28,7 @@ class ODSApiPdBridge() :
     urlRegEx        = re.compile( "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+" )
     datasetsColumns = {
         'metas.title' : {
-            'enteteDeColonne' : 'Jeu de données',
+            'enteteDeColonne' : 'Jeux de données',
             'sortPriority'    : 1
         },
         'metas.records_count' : {
@@ -44,11 +47,6 @@ class ODSApiPdBridge() :
     }
     datasetsColumnsTitles = [ dc[ 'enteteDeColonne' ] for dc in datasetsColumns.values() ]
 
-    class BadRequestResponse() :
-        def __init__( self, code ) :
-            self.code = code
-
-
     def __init__( self, apiUrls = None, apiVersion = "1.0", responseFormat = "json" ) :
 
         # INITIALISATION DES PROPRIÉTÉS PRIVÉES
@@ -61,6 +59,8 @@ class ODSApiPdBridge() :
         self.addUrl( apiUrls )
         self.format         = responseFormat    # Correspond à '_private_format'
         self.apiVersion     = apiVersion        # Correspond à '_private_apiVersion'
+
+        self.session = AsyncSession( n = 10 )
 
     #########################################################
     # DÉFINITIONS DES GETTERS ET SETTERS
@@ -153,12 +153,164 @@ class ODSApiPdBridge() :
         ret = []
         for k in ODSApiPdBridge.datasetsColumns.keys() :
             if 'sortPriority' in ODSApiPdBridge.datasetsColumns[ k ] :
-                ret.append( ( ODSApiPdBridge.datasetsColumns[ k ][ 'sortPriority' ] , ODSApiPdBridge.datasetsColumns[ k ][ 'enteteDeColonne' ] ) )
+                ret.append(
+                    (
+                        ODSApiPdBridge.datasetsColumns[ k ][ 'sortPriority' ],
+                        ODSApiPdBridge.datasetsColumns[ k ][ 'enteteDeColonne' ]
+                    )
+                )
         ret.sort( key = lambda tup: tup[ 0 ] )
         print( ret )
         return [ t[ 1 ] for t in ret ]
 
-    def get( self, apiUrl, apiEntry , apiTool, params = None ) :
+    async def asyncGet( self ) :
+        try :
+            for i, r in enumerate( self.reqs ) :
+                req = None
+                if 'params' in r :
+                    req = await self.session.get(
+                        "{apiUrl}{apiEntry}/{apiVersion}/{apiTool}".format(
+                            apiUrl     = r[ 'apiUrl' ],
+                            apiEntry   = r[ 'apiEntry' ],
+                            apiVersion = r[ 'apiVersion' ],
+                            apiTool    = r[ 'apiTool' ]
+                        ),params = r[ 'params' ]
+                    )
+                else :
+                    req = await self.session.get(
+                        "{apiUrl}{apiEntry}/{apiVersion}/{apiTool}".format(
+                            apiUrl     = r[ 'apiUrl' ],
+                            apiEntry   = r[ 'apiEntry' ],
+                            apiVersion = r[ 'apiVersion' ],
+                            apiTool    = r[ 'apiTool' ]
+                        )
+                    )
+                r[ 'parserCallback' ](
+                    **{
+                        'response'     : req,
+                        'callback'     : r[ 'callback' ],
+                        'parserParams' : r[ 'parserParams' ]
+                    }
+                )
+
+        except Exception as e:
+            print( e)
+
+        except :
+            print( "err" )
+
+    def testCallback( self, rep ) :
+        print( rep.text )
+
+
+    def get(    self, apiUrl, apiEntry , apiTool, params = None,
+                callback, parserCallback, parserParams = None
+        ) :
+        self.reqs = []
+        if type( params ) == dict :
+            self.reqs.append(
+                {
+                    'apiUrl'        : apiUrl,
+                    'apiEntry'      : apiEntry,
+                    'apiVersion'    : self.apiVersion,
+                    'apiTool'       : apiTool,
+                    'params'        : params,
+                    'callback'      : callback,
+                    'parserCallback': parserCallback,
+                    'parserParams'  : parserParams
+                }
+            )
+        else :
+            self.reqs.append(
+                {
+                    'apiUrl'        : apiUrl,
+                    'apiEntry'      : apiEntry,
+                    'apiVersion'    : self.apiVersion,
+                    'apiTool'       : apiTool,
+                    'callback'      : self.testCallback,
+                    'parserCallback': parserCallback,
+                    'parserParams'  : parserParams
+                }
+            )
+        rez = False
+        try :
+            rez = self.session.run( self.asyncGet )
+        except SystemExit:
+            print( "sys exit" )
+        #return BadRequestResponse( code = 504 )
+
+    def reqDict(  self, apiUrl, apiEntry , apiTool, params = None,
+                    callback, parserCallback, parserParams = None
+        ) :
+        if type( params ) == dict :
+            return {
+                'apiUrl'        : apiUrl,
+                'apiEntry'      : apiEntry,
+                'apiVersion'    : self.apiVersion,
+                'apiTool'       : apiTool,
+                'params'        : params,
+                'callback'      : callback,
+                'parserCallback': parserCallback,
+                'parserParams'  : parserParams
+            }
+        else :
+            return {
+                'apiUrl'        : apiUrl,
+                'apiEntry'      : apiEntry,
+                'apiVersion'    : self.apiVersion,
+                'apiTool'       : apiTool,
+                'callback'      : self.testCallback,
+                'parserCallback': parserCallback,
+                'parserParams'  : parserParams
+            }
+
+
+    def get2( self, apiUrl, apiEntry , apiTool, params = None ) :
+        req = 0
+        self.reqs = []
+        try :
+            if type( params ) == dict :
+                req =  self.session.get(
+                            "{apiUrl}{apiEntry}/{apiVersion}/{apiTool}".format(
+                                apiUrl     = apiUrl,
+                                apiEntry    = apiEntry,
+                                apiVersion  = self.apiVersion,
+                                apiTool     = apiTool
+                            ),params = params
+                )
+            else :
+                req = self.session.get(
+                            "{apiUrl}{apiEntry}/{apiVersion}/{apiTool}".format(
+                                apiUrl     = apiUrl,
+                                apiEntry    = apiEntry,
+                                apiVersion  = self.apiVersion,
+                                apiTool     = apiTool
+                            )
+                    )
+            print( type( req ) )
+            if str( req.status_code ) == "200":
+                print( )
+                return req[ 0 ]
+            else :
+                return BadRequestResponse( code = req.status_code )
+        except :
+            return BadRequestResponse( code = 504 )
+
+
+    def getOLD( self, apiUrl, apiEntry , apiTool, params = None ) :
+        self.startLoad()
+        thread = ThreadedRequest(
+            "1", apiUrl, apiEntry , apiTool, self.apiVersion, params )
+
+        thread.start()
+        thread.join()
+        self.endLoad()
+        return thread.ret
+
+    def startLoad( self ) : print( "startLoad" )
+    def endLoad( self )   : print( "endLoad" )
+
+    def getBCKP( self, apiUrl, apiEntry , apiTool, params = None ) :
         req = 0
         try :
             if type( params ) == dict :
@@ -182,9 +334,9 @@ class ODSApiPdBridge() :
             if str( req.status_code ) == "200":
                 return req
             else :
-                return ODSApiPdBridge.BadRequestResponse( code = req.status_code )
+                return BadRequestResponse( code = req.status_code )
         except :
-            return ODSApiPdBridge.BadRequestResponse( code = 504 )
+            return BadRequestResponse( code = 504 )
 
     def csvFormatToDf( self, csv, sep = ";" ) :
         return pd.read_csv( StringIO( csv.text ), sep = sep )
@@ -206,7 +358,26 @@ class ODSApiPdBridge() :
             return self.jsonFormatToDf( json = data, recordsKey = recordsKey )
 
 
-    def getNbDatasets( self, apiUrl ) :
+    def requestNbDatasets( self, apiUrl, callback ):
+        req = self.get(
+            apiUrl     = apiUrl,
+            apiEntry   = "datasets",
+            apiTool    = "search",
+            params     =   {
+              "format"   : "json",
+              "rows"     : "0"
+            },
+            parserCallback = self.responseNbDataSets,
+            callback = callback,
+        )
+
+    def responseNbDataSets( self, response, callback, parserParams ) :
+        if type( req ) != BadRequestResponse :
+            callback( response.json()[ 'nhits' ] )
+        else :
+            callback( response )
+
+    def getNbDatasets( self, apiUrl, callback ) :
         req = self.get(
             apiUrl     = apiUrl,
             apiEntry   = "datasets",
@@ -216,10 +387,66 @@ class ODSApiPdBridge() :
               "rows"     : "0"
             }
         )
-        if type( req ) != ODSApiPdBridge.BadRequestResponse :
+        if type( req ) != BadRequestResponse :
             return req.json()[ "nhits" ]
         else :
             return req
+
+
+    def getNbDatasetsBCKP( self, apiUrl ) :
+        req = self.get(
+            apiUrl     = apiUrl,
+            apiEntry   = "datasets",
+            apiTool    = "search",
+            params     =   {
+              "format"   : "json",
+              "rows"     : "0"
+            }
+        )
+        if type( req ) != BadRequestResponse :
+            return req.json()[ "nhits" ]
+        else :
+            return req
+
+    def requestDatasets(
+        self, apiUrl = "", start = 0, rows = 10, format = None, sep = ";",
+        raw = False, callback
+    ) :
+        frmt = format if format != None else self.format
+        data = self.get(
+            apiUrl     =   apiUrl,
+            apiEntry   =   "datasets",
+            apiTool    =   "search",
+            params     =   {
+                "format"  : str( frmt ),
+                "rows"    : str( rows ),
+                "start"   : str( start )
+            },
+            parserCallback = self.responseDatasets,
+            callback = callback,
+            parserParams = {
+                'raw'       : raw,
+                'format'    : frmt
+            }
+        )
+
+    def responseDatasets( self, response, callback, parserParams ) :
+        if type( response ) == BadRequestResponse :
+            callback( data )
+
+        if parserParams[ 'raw' ] == False :
+            callback(
+                json_normalize(
+                    data = response.json()[ "datasets" ],
+                    #record_path = ["fields"],
+                    meta = [["metas" ],["fields"]]
+                )
+            )
+        else :
+            if frmt == "csv" :
+                return data.text
+            elif frmt == "json" :
+                return data.json()
 
 
     def getDatasets(    self, apiUrl = "", start = 0, rows = 10,
@@ -236,32 +463,36 @@ class ODSApiPdBridge() :
                 "start"   : str( start )
             }
         )
-        if type( data ) == ODSApiPdBridge.BadRequestResponse :
+        if type( data ) == BadRequestResponse :
             return data
 
         if raw == False :
-            return json_normalize(  data = data.json()[ "datasets" ],
-                                    #record_path = ["fields"],
-                                    meta = [["metas" ],["fields"]]
+            return json_normalize(
+                data = data.json()[ "datasets" ],
+                #record_path = ["fields"],
+                meta = [["metas" ],["fields"]]
             )
         else :
-            if frmt == "csv" :
-                return data.text
-            elif frmt == "json" :
-                return data.json()
+            if parserParams[ 'frmt' ] == "csv" :
+                callback( response.text )
+            elif parserParams[ 'frmt' ] == "json" :
+                callback( response.json() )
 
 
-    def getDatasetsInfo( self, apiUrl = "", start = 0, rows = 10 ) :
+    def getDatasetsInfo( self, , apiUrl = "", start = 0, rows = 10 ) :
+
+
+    def getDatasetsInfoBCKP( self, apiUrl = "", start = 0, rows = 10 ) :
         if rows == "all" :
             nbDatasets = self.getNbDatasets( apiUrl = apiUrl )
-            if type( nbDatasets ) == ODSApiPdBridge.BadRequestResponse :
+            if type( nbDatasets ) == BadRequestResponse :
                 return nbDatasets
             rows = int( nbDatasets )
         data = self.getDatasets(
             apiUrl  = apiUrl,
             start   = start,
             rows    = rows )
-        if type( data ) == ODSApiPdBridge.BadRequestResponse :
+        if type( data ) == BadRequestResponse :
             return data
 
         df = data[ [ k for k in ODSApiPdBridge.datasetsColumns.keys() ] ]
@@ -306,7 +537,7 @@ class ODSApiPdBridge() :
             apiTool    =   "search",
             params     =   parametres
         )
-        if type( data ) == ODSApiPdBridge.BadRequestResponse :
+        if type( data ) == BadRequestResponse :
             return data
 
         if raw == False :
