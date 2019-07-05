@@ -51,9 +51,5 @@ class ThreadedRequest( Thread ) :
             print( ValueError )
         except requests.exceptions.RequestException as e :
             print( e )
-#        except SomeException :
-#            tb = sys.exc_info()[2]
-#            raise OtherException(...).with_traceback(tb)
         except :
-            print("except")
             self.ret = BadRequestResponse( code = 504 )

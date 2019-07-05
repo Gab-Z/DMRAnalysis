@@ -8,10 +8,11 @@ if platform.system() == "Windows" :
 class LocalCSVReader() :
 
     def __init__( self, dirPaths ) :
-        print( dirPaths )
         if type( dirPaths ) == str :
             dirPaths = [ dirPaths ]
         self.srcDirs = dirPaths
+
+        self.loadedDataFrames = {}
 
     def listDir( self, targetDirName ) :
         return [ os.path.join( targetDirName, file ) for file in os.listdir( path = targetDirName ) ]
@@ -24,7 +25,12 @@ class LocalCSVReader() :
         return ret
 
     def openFile( self, filePath ) :
-        print("file : " + filePath )
-        print( str( os.path.exists( filePath ) ) )
+
         df = pd.read_csv( os.path.realpath( filePath ), sep = ";", header = 0 )
         return df
+
+    def getStaticDataFrame( self, fileName ) :
+        if fileName not in self.loadedDataFrames :
+            filePath = os.path.join( self.srcDirs[ 0 ], fileName )
+            self.loadedDataFrames[ 'fileName' ] = self.openFile( filePath )
+        return self.loadedDataFrames[ 'fileName' ]

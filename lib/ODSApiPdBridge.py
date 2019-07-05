@@ -58,7 +58,8 @@ class ODSApiPdBridge() :
 
         # AFFECTATION DES ARGUMENTS CONSTRUCTEUR AUX PROPRIÉTÉS PRIVÉES
         #self.apiUrls         = apiUrls            # Correspond à '_private_apiUrls'
-        self.addUrl( apiUrls )
+        if apiUrls != None :
+            self.addUrl( apiUrls )
         self.format         = responseFormat    # Correspond à '_private_format'
         self.apiVersion     = apiVersion        # Correspond à '_private_apiVersion'
 
@@ -100,7 +101,7 @@ class ODSApiPdBridge() :
             if url[ len( str( url ) ) - 6 ::] != "/api/" :
                 url += "/api/"
             self.apiUrls.append( url )
-            print( self.apiUrls )
+
 
     # PUBLIC : 'format' / PRIVÉ : '_private_format'
     @property
@@ -155,10 +156,43 @@ class ODSApiPdBridge() :
             if 'sortPriority' in ODSApiPdBridge.datasetsColumns[ k ] :
                 ret.append( ( ODSApiPdBridge.datasetsColumns[ k ][ 'sortPriority' ] , ODSApiPdBridge.datasetsColumns[ k ][ 'enteteDeColonne' ] ) )
         ret.sort( key = lambda tup: tup[ 0 ] )
-        print( ret )
         return [ t[ 1 ] for t in ret ]
 
     def get( self, apiUrl, apiEntry , apiTool, params = None ) :
+        req = 0
+        ret = None
+        try :
+            reqStr = "{apiUrl}{apiEntry}/{apiVersion}/{apiTool}".format(
+                apiUrl     = apiUrl,
+                apiEntry    = apiEntry,
+                apiVersion  = self.apiVersion,
+                apiTool     = apiTool
+            )
+            reqDict = { 'stream' : True }
+            if type( params ) == dict :
+                reqDict[ 'params' ] = params
+
+            with requests.get(
+                reqStr,
+                **reqDict
+            ) as req :
+                for chunk in req.iter_content(
+                    chunk_size = 256,
+                    decode_unicode = True
+                ) :
+                    if chunk: # filter out keep-alive new chunks
+                        if ret == None :
+                            ret = chunk
+                        else :
+                            ret = ret + chunk
+            if str( req.status_code ) == "200":
+                return json.loads( ret )
+            else :
+                return ODSApiPdBridge.BadRequestResponse( code = req.status_code )
+        except Exception as e :
+            return ODSApiPdBridge.BadRequestResponse( code = 504 )
+
+    def get2( self, apiUrl, apiEntry , apiTool, params = None ) :
         req = 0
         try :
             if type( params ) == dict :
@@ -192,9 +226,9 @@ class ODSApiPdBridge() :
 
     def jsonFormatToDf( self, json, recordsKey = None ) :
         if type( recordsKey ) == str :
-            return json_normalize( json.json()[ recordsKey ] )
+            return json_normalize( json[ recordsKey ] )
         else :
-            return json_normalize( json.json() )
+            return json_normalize( json )
 
 
     def convertToDfByFormat(    self, format = None, sep = ";",
@@ -217,7 +251,7 @@ class ODSApiPdBridge() :
             }
         )
         if type( req ) != ODSApiPdBridge.BadRequestResponse :
-            return req.json()[ "nhits" ]
+            return req[ "nhits" ]
         else :
             return req
 
@@ -240,7 +274,7 @@ class ODSApiPdBridge() :
             return data
 
         if raw == False :
-            return json_normalize(  data = data.json()[ "datasets" ],
+            return json_normalize(  data = data[ "datasets" ],
                                     #record_path = ["fields"],
                                     meta = [["metas" ],["fields"]]
             )
@@ -248,7 +282,7 @@ class ODSApiPdBridge() :
             if frmt == "csv" :
                 return data.text
             elif frmt == "json" :
-                return data.json()
+                return data
 
 
     def getDatasetsInfo( self, apiUrl = "", start = 0, rows = 10 ) :
@@ -320,4 +354,4 @@ class ODSApiPdBridge() :
             if frmt == "csv" :
                 return data.text
             elif frmt == "json" :
-                return data.json()
+                return data
